@@ -4,9 +4,12 @@ import logging #Debug logging
 import csv  # For saving backup data
 from dotenv import load_dotenv
 import os
-from modules.read_csv import load_pattern_data
 from datetime import datetime, timezone as dt_timezone
 from pytz import timezone as pytz_timezone
+
+# Import from modules
+from modules.read_csv import load_pattern_data
+from modules.tags import get_tags_for_category
 
 # Load environment variables
 load_dotenv()
@@ -55,32 +58,6 @@ tree = discord.app_commands.CommandTree(client)  # Command tree for slash comman
 if Server_ID is None or not Server_ID.isdigit():
     logging.critical("SERVER_ID is not set or invalid in the environment variables. Exiting.")
     raise ValueError("SERVER_ID is not set or invalid in the environment variables.")
-
-# Tags Dictionaries
-Designer_Tags = [
-    discord.ForumTag(name="Accessory"),
-    discord.ForumTag(name="Baby/Child"),
-    discord.ForumTag(name="Book"),
-    discord.ForumTag(name="Cardigan/Jacket"),
-    discord.ForumTag(name="Dress/Skirt"),
-    discord.ForumTag(name="Hat"),
-    discord.ForumTag(name="Home"),
-    discord.ForumTag(name="Man"),
-    discord.ForumTag(name="Neckwear"),
-    discord.ForumTag(name="Other"),
-    discord.ForumTag(name="Socks"),
-    discord.ForumTag(name="Sweater/Jumper"),
-    discord.ForumTag(name="Top/Tank/Blouse"),
-    discord.ForumTag(name="Toys"),
-    discord.ForumTag(name="Vest/Slipover"),
-    ]
-Publisher_Tags = [
-    
-    discord.ForumTag(name="eBook"),
-    discord.ForumTag(name="High Quality"),
-    discord.ForumTag(name="Magazine"),
-    discord.ForumTag(name="Single Pattern"),
-    ]
 
 # Function to load data from CSV file
 def load_pattern_data(file_path):
@@ -296,10 +273,8 @@ async def create_server(interaction: discord.Interaction):
         for forum_name, posts in forums.items():
             try:
             # Determine which tags to use based on the category
-                if category_name in ["Publisher", "Yarn Houses and Brands"]:
-                    forum_tags = Publisher_Tags
-                else:
-                    forum_tags = Designer_Tags
+                forum_tags = get_tags_for_category(category_name)
+
                 # Get or create the forum channel
                 forum_channel = existing_forums.get(forum_name)
                 if not forum_channel:
