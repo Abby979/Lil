@@ -1,5 +1,7 @@
 import discord
 
+# Tags Dictionaries
+
 Designer_Tags = [
     discord.ForumTag(name="Accessory"),
     discord.ForumTag(name="Baby/Child"),
