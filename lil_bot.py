@@ -2,20 +2,27 @@ import discord
 import logging #Debug logging
 import os
 from datetime import datetime, timezone as dt_timezone
+from modules.role_utils import assign_role, has_role_at_least, Role
 
 # Import from modules
 from modules.read_csv import load_pattern_data
 from modules.tags_dictionaries import get_tags_for_category
-from modules.config import BOT_TOKEN, REAL_SERVER_ID, TEST_SERVER_ID, OWNER_ID, LOCAL_TZ, index_file_path
+from modules.config import (
+    BOT_TOKEN, OWNER_ID, LOCAL_TZ,
+    SERVERS, CRAFTERS
+)
 from modules.commands import register_commands
 from modules.utils import convert_to_local_time, save_last_backup_time
 
-# Test Mode toggle
+# Craft and test Mode toggle
+CRAFT = "knitting"  # Set to "knitting" or "sewing" based on your craft
 test_mode = True  # Set to True for test server, False for main server
-if test_mode:
-    server_id = TEST_SERVER_ID
-else:
-    server_id = REAL_SERVER_ID
+
+server_key = f"{'test' if test_mode else 'real'}_{CRAFT}"
+server_config = SERVERS[server_key]
+server_id = server_config["id"]
+crafter_config = CRAFTERS[CRAFT]
+last_backup_file="last_backup.txt"
 
 print(f"server_id loaded: {server_id}")
 
@@ -34,7 +41,7 @@ intents.guilds = True  # Required for accessing guild-level resources
 client = discord.Client(intents=intents)
 tree = discord.app_commands.CommandTree(client)  # Command tree for slash commands
 
-if server_id is None or not server_id.isdigit():
+if server_id is None:
     logging.critical("server_id is not set or invalid in the environment variables. Exiting.")
     raise ValueError("server_id is not set or invalid in the environment variables.")
 
@@ -47,9 +54,10 @@ register_commands(
     save_last_backup_time = save_last_backup_time,
     get_tags_for_category = get_tags_for_category,
     load_pattern_data = load_pattern_data,
-    index_file_path = index_file_path,
+    index_file_path = crafter_config["index_file"],
     convert_to_local_time = convert_to_local_time,
-    local_tz = LOCAL_TZ)
+    local_tz = LOCAL_TZ,
+    last_backup_file=last_backup_file)
 
 @client.event
 async def on_ready():

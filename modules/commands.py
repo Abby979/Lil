@@ -225,7 +225,7 @@ def register_commands(tree: app_commands.CommandTree,
                             name=post['post_title'],  # Post title
                             content=post['message'],
                             applied_tags=[tag for tag in forum_channel.available_tags if tag.name in post['tags']] if post['tags'] else [],
-                            auto_archive_duration=60
+                            auto_archive_duration=60 # Posts archive after 1 hour to avoid Discord active post limits
                         )
                         print(f"Created post: {post['post_title']} in forum: {forum_name}")
                         logging.info(f"Created post: {post['post_title']} in forum: {forum_name}")
@@ -239,7 +239,7 @@ def register_commands(tree: app_commands.CommandTree,
                             logging.info(f"Attachment '{post['attachments']}' added to post '{post['post_title']}'.")
                             '''
                     
-                        await asyncio.sleep(3)  # Pause to avoid rate limits
+                        await asyncio.sleep(3)  # Pause to ensure 1000 posts take over an hour, avoids Discord active posts limits
                         
                     except Exception as e:
                         logging.exception(f"Exception occurred while creating post '{post['post_title']}' in forum '{forum_name}': {str(e)}")
