@@ -5,6 +5,7 @@ import csv
 import os
 from datetime import datetime
 import asyncio
+from modules.role_utils import has_role_at_least, Role
 
 def register_commands(tree: app_commands.CommandTree, 
     server_id: int, 
@@ -24,9 +25,11 @@ def register_commands(tree: app_commands.CommandTree,
 # Backup server command
     @tree.command(name="backup", description="Back up the server data.", guild=discord.Object(id=int(server_id)))
     async def backup_server(interaction: discord.Interaction):
-        if interaction.user.id != owner_id:
+        user_id = interaction.user.id
+        # Require role OWNER or higher (OWNER is highest, so exact match)
+        if not has_role_at_least(user_id, Role.OWNER):
             await interaction.response.send_message(
-                "You are not authorized to use this command.", ephemeral=True
+                "Sorry, you are not authorized to use this command.", ephemeral=True
             )
             return
 
@@ -119,9 +122,11 @@ def register_commands(tree: app_commands.CommandTree,
     # Create Server command
     @tree.command(name="create", description="Create a new server with categories and forums.", guild=discord.Object(id=int(server_id)))
     async def create_server(interaction: discord.Interaction):
-        if interaction.user.id != owner_id:
+        user_id = interaction.user.id
+        # Require role OWNER or higher (OWNER is highest, so exact match)
+        if not has_role_at_least(user_id, Role.OWNER):
             await interaction.response.send_message(
-                "You are not authorized to use this command.", ephemeral=True
+                "Sorry, you are not authorized to use this command.", ephemeral=True
             )
             return
         await interaction.response.defer(thinking=True)
@@ -275,9 +280,11 @@ def register_commands(tree: app_commands.CommandTree,
     #Update command
     @tree.command(name="update", description="Update the server backup with new or updated threads.", guild=discord.Object(id=int(server_id)))
     async def update_backup(interaction: discord.Interaction):
-        if interaction.user.id != owner_id:
+        user_id = interaction.user.id
+        # Require role OWNER or higher (OWNER is highest, so exact match)
+        if not has_role_at_least(user_id, Role.OWNER):
             await interaction.response.send_message(
-                "You are not authorized to use this command.", ephemeral=True
+                "Sorry, you are not authorized to use this command.", ephemeral=True
             )
             return
         await interaction.response.defer(thinking=True)  # Acknowledge the command
