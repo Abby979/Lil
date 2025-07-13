@@ -1,11 +1,13 @@
 import discord
 from discord import app_commands, Interaction, Object
+from discord.utils import get
 import logging
 import csv
 import os
 from datetime import datetime
 import asyncio
-from modules.role_utils import has_role_at_least, Role
+from modules.role_utils import has_role_at_least, Role, get_user_role, assign_role_to_user
+from modules.decorators import require_role_at_least
 
 def register_commands(tree: app_commands.CommandTree, 
     server_id: int, 
@@ -21,17 +23,44 @@ def register_commands(tree: app_commands.CommandTree,
 
     BACKUP_FOLDER = os.path.join("data", "backups")
 
+# Assign role command
+    @tree.command(name="assign", description="Assign a role to a user.", guild=Object(id=int(server_id)))
+    @require_role_at_least(Role.ADMIN)  # Only admins and above can assign roles
+    @app_commands.choices(
+        role=[app_commands.Choice(name=r.name.capitalize(), value=r.value) for r in Role if r != Role.UNVERIFIED])
+    @app_commands.describe(
+        user="The user to assign a role to.",
+        role="The role to assign."
+    )
+    async def assign_role(interaction: Interaction, user: discord.Member, role: Role):
+        assigner_id = interaction.user.id
+        assigner_role = get_user_role(assigner_id)
+        target_id = user.id
+        target_role = get_user_role(target_id)
+
+        # Prevent assigning a role higher or equal to your own
+        if role.value >= assigner_role.value:
+            await interaction.response.send_message(
+                f"You can only assign roles lower than your own (your role: **{assigner_role.name}**).", ephemeral=True
+            )
+            return
+
+        # Prevent modifying someone with equal or higher role
+        if target_role.value >= assigner_role.value:
+            await interaction.response.send_message(
+                f"You cannot change the role of someone with an equal or higher role (target: **{target_role.name}**).", ephemeral=True
+            )
+            return
+
+        # Assign the role using the unified helper function
+        success, msg = await assign_role_to_user(user, role, interaction.guild)
+        await interaction.response.send_message(msg, ephemeral=True)
+
 
 # Backup server command
     @tree.command(name="backup", description="Back up the server data.", guild=discord.Object(id=int(server_id)))
+    @require_role_at_least(Role.OWNER)
     async def backup_server(interaction: discord.Interaction):
-        user_id = interaction.user.id
-        # Require role OWNER or higher (OWNER is highest, so exact match)
-        if not has_role_at_least(user_id, Role.OWNER):
-            await interaction.response.send_message(
-                "Sorry, you are not authorized to use this command.", ephemeral=True
-            )
-            return
 
         await interaction.response.defer(thinking=True)  # Acknowledge the command as it might take time.
         # Step 1: Fetch Data
@@ -121,14 +150,8 @@ def register_commands(tree: app_commands.CommandTree,
 
     # Create Server command
     @tree.command(name="create", description="Create a new server with categories and forums.", guild=discord.Object(id=int(server_id)))
+    @require_role_at_least(Role.OWNER)
     async def create_server(interaction: discord.Interaction):
-        user_id = interaction.user.id
-        # Require role OWNER or higher (OWNER is highest, so exact match)
-        if not has_role_at_least(user_id, Role.OWNER):
-            await interaction.response.send_message(
-                "Sorry, you are not authorized to use this command.", ephemeral=True
-            )
-            return
         await interaction.response.defer(thinking=True)
 
         # Read the pattern data from the CSV file
@@ -279,14 +302,8 @@ def register_commands(tree: app_commands.CommandTree,
 
     #Update command
     @tree.command(name="update", description="Update the server backup with new or updated threads.", guild=discord.Object(id=int(server_id)))
+    @require_role_at_least(Role.OWNER)
     async def update_backup(interaction: discord.Interaction):
-        user_id = interaction.user.id
-        # Require role OWNER or higher (OWNER is highest, so exact match)
-        if not has_role_at_least(user_id, Role.OWNER):
-            await interaction.response.send_message(
-                "Sorry, you are not authorized to use this command.", ephemeral=True
-            )
-            return
         await interaction.response.defer(thinking=True)  # Acknowledge the command
         logging.info("Starting update process.")
 
