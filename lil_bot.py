@@ -2,12 +2,23 @@ import discord
 import logging #Debug logging
 import os
 from logging.handlers import RotatingFileHandler
+from flask import Flask
+import threading
 
 # Import from modules
 from modules.read_csv import load_pattern_data
 from modules.tags_dictionaries import get_tags_for_category
 from modules.config import BOT_TOKEN, OWNER_ID, index_file_path, test_guild_id
 from modules.commands import register_commands
+
+app = Flask("")
+
+@app.route("/")
+def home():
+    return "Bot is alive!", 200
+
+def run_webserver():
+    app.run(host="0.0.0.0", port=8080)
 
 # Debug logging configuration
 os.makedirs("logs", exist_ok=True)  # Ensure the logs directory exists
