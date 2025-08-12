@@ -211,6 +211,5 @@ __pycache__/
 *.pyc
 Lil-bot.code-workspace
 .venv
-logs/
 .DS_Store
 data/updates/

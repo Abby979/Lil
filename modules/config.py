@@ -13,3 +13,4 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 OWNER_ID = int(os.getenv("OWNER_ID")) if os.getenv("OWNER_ID") else None
 LOCAL_TZ = timezone(os.getenv("LOCAL_TZ", "UTC"))
 index_file_path = os.getenv("INDEX_FILE_PATH", "data/index.csv")
+test_guild_id = parse_id(os.getenv("TEST_SERVER_ID"))

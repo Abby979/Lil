@@ -3,7 +3,7 @@ from discord import app_commands
 import logging
 import asyncio
 from modules.read_csv import load_pattern_data
-from modules.config import BOT_TOKEN, OWNER_ID, index_file_path
+from modules.config import BOT_TOKEN, OWNER_ID, index_file_path, test_guild_id
 
 def register_commands(tree: app_commands.CommandTree, 
     owner_id: int,
