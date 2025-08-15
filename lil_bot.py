@@ -112,7 +112,14 @@ register_commands(
 async def on_ready():
     print(f"Logged in as {client.user} (ID: {client.user.id})")
     
-    for server in [knitting_test_server_id, sewing_test_server_id]:
+    server_ids = [
+        knitting_server_id,
+        knitting_test_server_id,
+        sewing_server_id,
+        sewing_test_server_id
+    ]
+
+    for server in [server_ids]:
         if server:
             try:
                 guild = discord.Object(id=server)
