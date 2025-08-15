@@ -27,13 +27,6 @@ def register_commands(tree, owner_id, get_tags_for_category, load_pattern_data):
                 "You are not authorized to use this command.", ephemeral=True
             )
             return
-        if interaction.guild.id == knitting_server_id or interaction.guild.id == knitting_test_server_id:
-            index_file = knitting_index_file_path
-        elif interaction.guild.id == sewing_server_id or interaction.guild.id == sewing_test_server_id:
-            index_file = sewing_index_file_path
-        else:
-            await interaction.response.send_message("Unsupported server", ephemeral=True)
-            return
         #Are you sure
         class ConfirmView(View):
             def __init__(self):
@@ -66,6 +59,13 @@ def register_commands(tree, owner_id, get_tags_for_category, load_pattern_data):
             return  # Exit command
 
         # Read the pattern data from the CSV file
+        if interaction.guild.id == knitting_server_id or interaction.guild.id == knitting_test_server_id:
+            index_file = knitting_index_file_path
+        elif interaction.guild.id == sewing_server_id or interaction.guild.id == sewing_test_server_id:
+            index_file = sewing_index_file_path
+        else:
+            await interaction.response.send_message("Unsupported server", ephemeral=True)
+            return
         categories = load_pattern_data(index_file)
 
         # Pre-fetch existing categories and forums for duplicate checks
@@ -194,3 +194,47 @@ def register_commands(tree, owner_id, get_tags_for_category, load_pattern_data):
 
             print("All done creating categories, channels, and posts!")
         print("Create command finished. Check the console for any errors or messages.")
+
+# Fetch Catbox link command
+    @tree.command(name="love", description="Tell us you love this pattern.")
+    async def love(interaction: discord.Interaction):
+        # Check if we're in a thread
+        if not isinstance(interaction.channel, discord.Thread):
+            await interaction.response.send_message(
+                "Please use this command inside a pattern's thread.", 
+                ephemeral=True
+            )
+            return
+
+        thread_title = interaction.channel.name
+        normalized_thread = normalize_name(thread_title)
+
+        # Decide which CSV to use based on server ID
+        if interaction.guild.id in [knitting_server_id, knitting_test_server_id]:
+            index_file = knitting_index_file_path
+        elif interaction.guild.id in [sewing_server_id, sewing_test_server_id]:
+            index_file = sewing_index_file_path
+        else:
+            await interaction.response.send_message("Unsupported server.", ephemeral=True)
+            return
+
+        # Load your CSV — but we want direct row access, not the nested category/forum structure
+        import csv
+        found_link = None
+        with open(index_file, newline='', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                if normalize_name(row["Title"]) == normalized_thread:
+                    found_link = row["Catbox link"].strip()
+                    break
+
+        if found_link:
+            await interaction.response.send_message(
+                f"❤️ Here's your Catbox link:\n{found_link}", 
+                ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(
+                "Sorry, I couldn't find a Catbox link for this pattern.",
+                ephemeral=True
+            )
