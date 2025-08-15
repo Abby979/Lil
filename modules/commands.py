@@ -230,7 +230,8 @@ def register_commands(tree, owner_id, get_tags_for_category, load_pattern_data):
 
         if found_link:
             await interaction.response.send_message(
-                f"❤️ Here's your Catbox link:\n{found_link}", 
+                f"❤️ Here's your Catbox link:\n{found_link}\n\n"
+                f"**Pattern title for easy renaming:**\n```{row['Title']}```",
                 ephemeral=True
             )
         else:
