@@ -8,11 +8,22 @@ import threading
 # Import from modules
 from modules.read_csv import load_pattern_data
 from modules.tags_dictionaries import get_tags_for_category
-from modules.config import BOT_TOKEN, OWNER_ID, index_file_path, test_guild_id
+from modules.config import (
+    BOT_TOKEN, 
+    OWNER_ID, 
+    LOCAL_TZ,
+    knitting_server_id,
+    knitting_index_file_path,
+    knitting_test_server_id,
+    sewing_server_id,
+    sewing_index_file_path,
+    sewing_test_server_id,
+)
 from modules.commands import register_commands
 
-# Flask app for keeping the bot alive
-# This is a simple web server to keep the bot running on Render
+# -----------------------------
+# Flask app to keep bot alive
+# -----------------------------
 app = Flask("")
 
 @app.route("/")
@@ -23,7 +34,9 @@ def run_webserver():
     port = int(os.environ.get("PORT", 8080))  # Use Render's assigned port
     app.run(host="0.0.0.0", port=port)
 
-# Debug logging configuration
+# -----------------------------
+# Logging configuration
+# -----------------------------
 os.makedirs("logs", exist_ok=True)  # Ensure the logs directory exists
 
 # Ensure the log file exists (optional, logging will create it anyway)
@@ -34,7 +47,7 @@ if not os.path.exists(log_file_path):
 logger = logging.getLogger()
 if logger.hasHandlers():
     logger.handlers.clear()
-logger.setLevel(logging.DEBUG)  # Set to level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+logger.setLevel(logging.DEBUG)  # Set gloval level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 file_handler = RotatingFileHandler(
     log_file_path, 
     maxBytes=5*1024*1024, 
@@ -42,13 +55,13 @@ file_handler = RotatingFileHandler(
     encoding='utf-8'
 )
 
-file_handler.setLevel(logging.DEBUG)
+file_handler.setLevel(logging.INFO)
 file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(file_formatter)
 
 # Console handler (logs to stdout)
 console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
+console_handler.setLevel(logging.DEBUG) #Render logs to console
 console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 console_handler.setFormatter(console_formatter)
 
@@ -56,8 +69,9 @@ console_handler.setFormatter(console_formatter)
 logger.addHandler(file_handler)
 logger.addHandler(console_handler)
 
-# Example log message
-logger.info("Bot starting up...")
+# -----------------------------
+# Discord client setup
+# -----------------------------
 
 # Create a client instance
 intents = discord.Intents.default()  # For basic functionality
@@ -66,26 +80,57 @@ intents.guilds = True  # Required for accessing guild-level resources
 client = discord.Client(intents=intents)
 tree = discord.app_commands.CommandTree(client)  # Command tree for slash commands
 
-# Register commands with the command tree
+# -----------------------------
+# Servers configuration
+# -----------------------------
+servers = [
+    {
+        "name": "knitting",
+        "guild_id": knitting_test_server_id or knitting_server_id,
+        "index_file_path": knitting_index_file_path
+    },
+    {
+        "name": "sewing",
+        "guild_id": sewing_test_server_id or sewing_server_id,
+        "index_file_path": sewing_index_file_path
+    }
+]
+
+# Register commands for each server
 register_commands(
-    tree, 
+    tree,
     OWNER_ID,
-    get_tags_for_category = get_tags_for_category,
-    load_pattern_data = load_pattern_data,
-    index_file_path = index_file_path,)
+    get_tags_for_category=get_tags_for_category,
+    load_pattern_data=load_pattern_data,
+)
+
+# -----------------------------
+# Discord events
+# -----------------------------
 
 @client.event
 async def on_ready():
     print(f"Logged in as {client.user} (ID: {client.user.id})")
     
-    # Sync commands to a test guild for instant update
-    if test_guild_id:
-            test_guild = discord.Object(id=test_guild_id)
-            await tree.sync(guild=test_guild)
-            print("Commands synced to test guild")
-            
-    await tree.sync()
-    print("Commands synced globally")
+    for server in [knitting_test_server_id, sewing_test_server_id]:
+        if server:
+            try:
+                guild = discord.Object(id=server)
+                await tree.sync(guild=guild)
+                print(f"Commands synced for guild {server}")
+            except Exception as e:
+                print(f"Failed to sync commands for guild {server}: {e}")
+
+    # Optional global sync (may fail on dev servers if permissions are restricted)
+    try:
+        await tree.sync()
+        print("Commands synced globally")
+    except Exception as e:
+        print(f"Global sync failed: {e}")
+
+# -----------------------------
+# Run bot and Flask server
+# -----------------------------
 
 if __name__ == "__main__":
     # Start Flask server in background thread

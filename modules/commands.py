@@ -1,48 +1,99 @@
 import discord
+from discord.ui import Button, View
 from discord import app_commands
+import re
 import logging
 import asyncio
 from modules.read_csv import load_pattern_data
-from modules.config import BOT_TOKEN, OWNER_ID, index_file_path, test_guild_id
+from modules.config import (
+    BOT_TOKEN, OWNER_ID,
+    knitting_server_id, knitting_index_file_path, knitting_test_server_id,
+    sewing_server_id, sewing_index_file_path, sewing_test_server_id)
 
-def register_commands(tree: app_commands.CommandTree, 
-    owner_id: int,
-    get_tags_for_category,
-    load_pattern_data,
-    index_file_path,):
+# Helper function to normalize names for matching
+def normalize_name(name: str) -> str:
+    # Lowercase, remove punctuation, collapse multiple spaces
+    return re.sub(r"[^\w\s]", "", name).strip().lower()
+
+#Commands
+def register_commands(tree, owner_id, get_tags_for_category, load_pattern_data):
 
 # Create Server command
     @tree.command(name="create", description="Create a new server with categories and forums.")
     async def create_server(interaction: discord.Interaction):
+        print("Guild ID:", interaction.guild.id)
         if interaction.user.id != owner_id:
             await interaction.response.send_message(
                 "You are not authorized to use this command.", ephemeral=True
             )
             return
-        await interaction.response.defer(thinking=False)
+        if interaction.guild.id == knitting_server_id or interaction.guild.id == knitting_test_server_id:
+            index_file = knitting_index_file_path
+        elif interaction.guild.id == sewing_server_id or interaction.guild.id == sewing_test_server_id:
+            index_file = sewing_index_file_path
+        else:
+            await interaction.response.send_message("Unsupported server", ephemeral=True)
+            return
+        #Are you sure
+        class ConfirmView(View):
+            def __init__(self):
+                super().__init__(timeout=60)  # 1 minute to respond
+                self.value = None  # store user's choice
+
+            @discord.ui.button(label="Yes", style=discord.ButtonStyle.green)
+            async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+                self.value = True
+                await interaction.response.edit_message(content="Confirmed! Creating now...", view=None)
+                self.stop()  # stop listening to buttons
+
+            @discord.ui.button(label="No", style=discord.ButtonStyle.red)
+            async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+                self.value = False
+                await interaction.response.edit_message(content="Cancelled.", view=None)
+                self.stop()
+
+        view = ConfirmView()
+        await interaction.response.send_message(
+            "Are you sure you want to create all categories, forums, and posts?", 
+            view=view, ephemeral=True
+        )
+
+        # Wait for user to click
+        await view.wait()
+
+        # If user cancelled or timeout
+        if not view.value:
+            return  # Exit command
 
         # Read the pattern data from the CSV file
-        categories = load_pattern_data(index_file_path)
+        categories = load_pattern_data(index_file)
 
         # Pre-fetch existing categories and forums for duplicate checks
-        existing_categories = {category.name: category for category in interaction.guild.categories}
-        existing_forums = {forum.name: forum for forum in interaction.guild.channels if isinstance(forum, discord.ForumChannel)}
+        existing_categories = {
+            normalize_name(category.name): category 
+            for category in interaction.guild.categories}
+        existing_forums = {
+            normalize_name(forum.name): forum 
+            for forum in interaction.guild.channels if isinstance(forum, discord.ForumChannel)}
         existing_posts = {}
+
         # Failed categories, forums, and posts for logging
         failed_categories = []
         failed_forums = []
         failed_posts = []
-        for forum_name, forum in existing_forums.items():
+
+        for forum_name, forum in {
+            ch.name: ch for ch in interaction.guild.channels if isinstance(ch, discord.ForumChannel)
+        }.items():
             try:
                 active_threads = forum.threads  # Fetch active threads
                 archived_threads = [thread async for thread in forum.archived_threads(limit=None)]  # Fetch public archived threads
                 all_threads = active_threads + archived_threads
                 logging.debug(f"Forum '{forum_name}' total threads: {len(all_threads)}, active threads: {len(active_threads)}, archived threads: {len(archived_threads)}")
-                existing_posts[forum_name] = [thread.name for thread in all_threads]  # Store existing post title
-                logging.debug(f"Existing posts in forum '{forum_name}': {existing_posts[forum_name]}")
+                existing_posts[normalize_name(forum_name)] = [thread.name for thread in all_threads]  # Store existing post title
             except Exception as e:
                 logging.error(f"Failed to fetch threads for forum '{forum_name}': {str(e)}")
-                existing_posts[forum_name] = []  # Default to an empty list if there's an error
+                existing_posts[normalize_name(forum_name)] = []  # Default to an empty list if there's an error
 
         logging.debug(f"Existing categories: {existing_categories}")
         logging.debug(f"Existing forums: {existing_forums}")
@@ -54,7 +105,8 @@ def register_commands(tree: app_commands.CommandTree,
         for category_name, forums in categories.items():
             try:
                 # Retrieve or create the category
-                category = existing_categories.get(category_name)
+                normalized_cat= normalize_name(category_name)
+                category = existing_categories.get(normalized_cat)
                 if not category:
                     print(f"Creating category: {category_name}")
                     category = await interaction.guild.create_category(category_name)
@@ -72,9 +124,9 @@ def register_commands(tree: app_commands.CommandTree,
                 try:
                 # Determine which tags to use based on the category
                     forum_tags = get_tags_for_category(category_name)
+                    normalized_forum= normalize_name(forum_name)
+                    forum_channel = existing_forums.get(normalized_forum)
 
-                    # Get or create the forum channel
-                    forum_channel = existing_forums.get(forum_name)
                     if not forum_channel:
                         print(f"Creating forum channel: {forum_name} in category {category_name}")
                         forum_channel = await interaction.guild.create_forum(
@@ -98,7 +150,7 @@ def register_commands(tree: app_commands.CommandTree,
                 for post in posts:
                     try:
                         # Check if a post with the same name already exists
-                        if post['post_title'] in existing_posts.get(forum_name, []):
+                        if post['post_title'] in existing_posts.get(normalized_forum, []):
                             logging.debug(f"Post '{post['post_title']}' already exists in forum '{forum_name}'. Skipping creation.")
                             continue  # Skip to the next post if already exists
 
